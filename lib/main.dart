@@ -144,15 +144,19 @@ class Etiqueta {
   Etiqueta({required this.nombre});
 }
 
+//Desde aquí
+
 class AgregarNotaScreen extends StatefulWidget {
   final List<Etiqueta> etiquetas;
+  final Nota? nota;
 
-  AgregarNotaScreen({required this.etiquetas});
+  AgregarNotaScreen({required this.etiquetas, this.nota});
 
   @override
   _AgregarNotaScreenState createState() => _AgregarNotaScreenState();
 }
 
+//Dede aquí
 class _AgregarNotaScreenState extends State<AgregarNotaScreen> {
   final TextEditingController _tituloController = TextEditingController();
   final TextEditingController _contenidoController = TextEditingController();
@@ -164,7 +168,12 @@ class _AgregarNotaScreenState extends State<AgregarNotaScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedEtiquetas = [];
+    if (widget.nota != null) {
+      _tituloController.text = widget.nota!.titulo;
+      _contenidoController.text = widget.nota!.contenido;
+      _selectedImages = widget.nota!.imagenes;
+      _selectedEtiquetas = widget.nota!.etiquetas;
+    }
   }
 
   void _guardarNota() {
@@ -195,6 +204,18 @@ class _AgregarNotaScreenState extends State<AgregarNotaScreen> {
       });
     }
   }
+
+  void _eliminarImagen(int index) {
+    setState(() {
+      final imageToRemove = _selectedImages[index];
+      _selectedImages.removeAt(index);
+      _contenidoController.text = _contenidoController.text.replaceAll(
+        '\n![Imagen](${imageToRemove.path})',
+        '',
+      );
+    });
+  }
+//desde aquí
 
   @override
   Widget build(BuildContext context) {
@@ -263,9 +284,19 @@ class _AgregarNotaScreenState extends State<AgregarNotaScreen> {
             ),
             if (_selectedImages.isNotEmpty)
               Column(
-                children: _selectedImages
-                    .map((image) => Image.file(image, height: 200))
-                    .toList(),
+                children: List.generate(_selectedImages.length, (index) {
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: Image.file(_selectedImages[index], height: 100),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.delete),
+                        onPressed: () => _eliminarImagen(index),
+                      ),
+                    ],
+                  );
+                }),
               ),
           ],
         ),
@@ -273,6 +304,8 @@ class _AgregarNotaScreenState extends State<AgregarNotaScreen> {
     );
   }
 }
+
+//hasta aquí
 
 class DetalleNotaScreen extends StatelessWidget {
   final Nota nota;
@@ -292,7 +325,7 @@ class DetalleNotaScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) =>
-                      AgregarNotaScreen(etiquetas: nota.etiquetas),
+                      AgregarNotaScreen(etiquetas: nota.etiquetas, nota: nota),
                 ),
               );
 
@@ -367,7 +400,6 @@ class EtiquetasScreen extends StatefulWidget {
   @override
   _EtiquetasScreenState createState() => _EtiquetasScreenState();
 }
-//desde aquí
 
 class _EtiquetasScreenState extends State<EtiquetasScreen> {
   TextEditingController _etiquetaController = TextEditingController();
