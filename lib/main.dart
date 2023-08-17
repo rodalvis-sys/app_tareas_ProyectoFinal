@@ -28,6 +28,7 @@ class NotaPage extends StatefulWidget {
 
 class _NotaPageState extends State<NotaPage> {
   List<Nota> notas = [];
+  List<Etiqueta> etiquetas = [];
 
   void _abrirDetalleNota(Nota nota) async {
     final resultado = await Navigator.push(
@@ -60,7 +61,7 @@ class _NotaPageState extends State<NotaPage> {
     final nota = await Navigator.push<Nota>(
       context,
       MaterialPageRoute(
-        builder: (context) => AgregarNotaScreen(),
+        builder: (context) => AgregarNotaScreen(etiquetas: etiquetas),
       ),
     );
 
@@ -76,6 +77,16 @@ class _NotaPageState extends State<NotaPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('App de Notas'),
+      ),
+      drawer: Drawer(
+        child: ListView(
+          children: [
+            ListTile(
+              title: Text('Etiquetas'),
+              onTap: () => _abrirEtiquetas(),
+            ),
+          ],
+        ),
       ),
       body: notas.isEmpty
           ? Center(
@@ -96,20 +107,47 @@ class _NotaPageState extends State<NotaPage> {
       ),
     );
   }
+
+  void _abrirEtiquetas() async {
+    final resultado = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EtiquetasScreen(etiquetas: etiquetas),
+      ),
+    );
+
+    if (resultado != null && resultado is List<Etiqueta>) {
+      setState(() {
+        etiquetas = resultado;
+      });
+    }
+  }
 }
 
 class Nota {
   String titulo;
   String contenido;
   List<File> imagenes;
+  List<Etiqueta> etiquetas;
 
-  Nota({required this.titulo, required this.contenido, required this.imagenes});
+  Nota({
+    required this.titulo,
+    required this.contenido,
+    required this.imagenes,
+    required this.etiquetas,
+  });
+}
+
+class Etiqueta {
+  String nombre;
+
+  Etiqueta({required this.nombre});
 }
 
 class AgregarNotaScreen extends StatefulWidget {
-  final Nota? nota;
+  final List<Etiqueta> etiquetas;
 
-  AgregarNotaScreen({this.nota});
+  AgregarNotaScreen({required this.etiquetas});
 
   @override
   _AgregarNotaScreenState createState() => _AgregarNotaScreenState();
@@ -118,25 +156,26 @@ class AgregarNotaScreen extends StatefulWidget {
 class _AgregarNotaScreenState extends State<AgregarNotaScreen> {
   final TextEditingController _tituloController = TextEditingController();
   final TextEditingController _contenidoController = TextEditingController();
-
   List<File> _selectedImages = [];
+  List<Etiqueta> _selectedEtiquetas = [];
+
   final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
-    if (widget.nota != null) {
-      _tituloController.text = widget.nota!.titulo;
-      _contenidoController.text = widget.nota!.contenido;
-      _selectedImages = widget.nota!.imagenes;
-    }
+    _selectedEtiquetas = [];
   }
 
   void _guardarNota() {
     final titulo = _tituloController.text;
     final contenido = _contenidoController.text;
-    final nuevaNota =
-        Nota(titulo: titulo, contenido: contenido, imagenes: _selectedImages);
+    final nuevaNota = Nota(
+      titulo: titulo,
+      contenido: contenido,
+      imagenes: _selectedImages,
+      etiquetas: _selectedEtiquetas,
+    );
 
     Navigator.of(context).pop(nuevaNota);
   }
@@ -200,6 +239,24 @@ class _AgregarNotaScreenState extends State<AgregarNotaScreen> {
                 hintText: 'Escribe tu nota...',
               ),
             ),
+            Wrap(
+              spacing: 8,
+              children: widget.etiquetas.map((etiqueta) {
+                return ChoiceChip(
+                  label: Text(etiqueta.nombre),
+                  selected: _selectedEtiquetas.contains(etiqueta),
+                  onSelected: (selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedEtiquetas.add(etiqueta);
+                      } else {
+                        _selectedEtiquetas.remove(etiqueta);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
             IconButton(
               icon: Icon(Icons.image),
               onPressed: _agregarImagen,
@@ -234,13 +291,16 @@ class DetalleNotaScreen extends StatelessWidget {
               final nuevaNota = await Navigator.push<Nota>(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => AgregarNotaScreen(nota: nota),
+                  builder: (context) =>
+                      AgregarNotaScreen(etiquetas: nota.etiquetas),
                 ),
               );
 
               if (nuevaNota != null) {
                 Navigator.pop(
-                    context, {'accion': 'editar', 'nuevaNota': nuevaNota});
+                  context,
+                  {'accion': 'editar', 'nuevaNota': nuevaNota},
+                );
               }
             },
           ),
@@ -255,8 +315,17 @@ class DetalleNotaScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            Text(nota.titulo,
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            Text(
+              nota.titulo,
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              children: nota.etiquetas.map((etiqueta) {
+                return Chip(label: Text(etiqueta.nombre));
+              }).toList(),
+            ),
             SizedBox(height: 16),
             Column(
               children: _parseMarkdownWithImages(nota.contenido),
@@ -273,11 +342,13 @@ class DetalleNotaScreen extends StatelessWidget {
     for (String line in lines) {
       if (line.contains('![Imagen]')) {
         final imageUrl = line.substring(
-            line.indexOf('(') + 1, line.indexOf(')', line.indexOf('(')));
+          line.indexOf('(') + 1,
+          line.indexOf(')', line.indexOf('(')),
+        );
         widgets.add(
           Image.file(
             File(imageUrl),
-            height: 200, // Ajusta aquí el tamaño deseado
+            height: 200,
           ),
         );
       } else {
@@ -285,5 +356,142 @@ class DetalleNotaScreen extends StatelessWidget {
       }
     }
     return widgets;
+  }
+}
+
+class EtiquetasScreen extends StatefulWidget {
+  final List<Etiqueta> etiquetas;
+
+  EtiquetasScreen({required this.etiquetas});
+
+  @override
+  _EtiquetasScreenState createState() => _EtiquetasScreenState();
+}
+//desde aquí
+
+class _EtiquetasScreenState extends State<EtiquetasScreen> {
+  TextEditingController _etiquetaController = TextEditingController();
+  List<Etiqueta> _etiquetas = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _etiquetas = widget.etiquetas;
+  }
+
+  void _agregarEtiqueta() {
+    final nuevaEtiqueta = _etiquetaController.text;
+    if (nuevaEtiqueta.isNotEmpty) {
+      setState(() {
+        _etiquetas.add(Etiqueta(nombre: nuevaEtiqueta));
+        _etiquetaController.clear();
+      });
+    }
+  }
+
+  void _editarEtiqueta(int index) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Editar Etiqueta'),
+          content: TextField(
+            controller: _etiquetaController,
+            decoration: InputDecoration(hintText: 'Nombre de la etiqueta'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                final nuevoNombre = _etiquetaController.text;
+                setState(() {
+                  _etiquetas[index] = Etiqueta(nombre: nuevoNombre);
+                });
+                Navigator.pop(context);
+              },
+              child: Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _eliminarEtiqueta(int index) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Eliminar Etiqueta'),
+          content: Text('¿Estás seguro de que deseas eliminar esta etiqueta?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _etiquetas.removeAt(index);
+                });
+                Navigator.pop(context);
+              },
+              child: Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Etiquetas'),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _etiquetaController,
+                    decoration: InputDecoration(
+                      hintText: 'Nueva etiqueta',
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.add),
+                  onPressed: _agregarEtiqueta,
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: _etiquetas.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  title: Text(_etiquetas[index].nombre),
+                  onTap: () => _editarEtiqueta(index),
+                  onLongPress: () => _eliminarEtiqueta(index),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
